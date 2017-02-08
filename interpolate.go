@@ -13,6 +13,7 @@ type interpolator struct {
 	Dialect
 	IgnoreBinary bool
 	N            int
+	BindValues   []interface{}
 }
 
 // InterpolateForDialect replaces placeholder in query with corresponding value in dialect
@@ -102,6 +103,14 @@ func (i *interpolator) encodePlaceholder(value interface{}) error {
 		i.WriteString("NULL")
 		return nil
 	}
+
+	if i.Dialect.PreparedStatement() {
+		i.WriteString(i.Placeholder(i.N))
+		i.N++
+		i.BindValues = append(i.BindValues, value)
+		return nil
+	}
+
 	v := reflect.ValueOf(value)
 	switch v.Kind() {
 	case reflect.String:

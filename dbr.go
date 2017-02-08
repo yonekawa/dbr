@@ -82,6 +82,7 @@ type SessionRunner interface {
 type runner interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)
 	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Prepare(query string) (*sql.Stmt, error)
 }
 
 func exec(runner runner, log EventReceiver, builder Builder, d Dialect) (sql.Result, error) {
@@ -89,6 +90,7 @@ func exec(runner runner, log EventReceiver, builder Builder, d Dialect) (sql.Res
 		Buffer:       NewBuffer(),
 		Dialect:      d,
 		IgnoreBinary: true,
+		BindValues:   make([]interface{}, 0),
 	}
 	err := i.interpolate(placeholder, []interface{}{builder})
 	query, value := i.String(), i.Value()
@@ -106,11 +108,28 @@ func exec(runner runner, log EventReceiver, builder Builder, d Dialect) (sql.Res
 		})
 	}()
 
-	result, err := runner.Exec(query, value...)
-	if err != nil {
-		return result, log.EventErrKv("dbr.exec.exec", err, kvs{
-			"sql": query,
-		})
+	var result sql.Result
+	if d.PreparedStatement() {
+		stmt, err := runner.Prepare(query)
+		if err != nil {
+			return nil, log.EventErrKv("dbr.exec.prepare", err, kvs{
+				"sql": query,
+			})
+		}
+		result, err = stmt.Exec(i.BindValues...)
+		if err != nil {
+			return result, log.EventErrKv("dbr.exec.exec", err, kvs{
+				"sql":  query,
+				"args": fmt.Sprint(i.BindValues),
+			})
+		}
+	} else {
+		result, err = runner.Exec(query, value...)
+		if err != nil {
+			return result, log.EventErrKv("dbr.exec.exec", err, kvs{
+				"sql": query,
+			})
+		}
 	}
 	return result, nil
 }
@@ -120,6 +139,7 @@ func query(runner runner, log EventReceiver, builder Builder, d Dialect, dest in
 		Buffer:       NewBuffer(),
 		Dialect:      d,
 		IgnoreBinary: true,
+		BindValues:   make([]interface{}, 0),
 	}
 	err := i.interpolate(placeholder, []interface{}{builder})
 	query, value := i.String(), i.Value()
@@ -137,12 +157,30 @@ func query(runner runner, log EventReceiver, builder Builder, d Dialect, dest in
 		})
 	}()
 
-	rows, err := runner.Query(query, value...)
-	if err != nil {
-		return 0, log.EventErrKv("dbr.select.load.query", err, kvs{
-			"sql": query,
-		})
+	var rows *sql.Rows
+	if d.PreparedStatement() {
+		stmt, err := runner.Prepare(query)
+		if err != nil {
+			return 0, log.EventErrKv("dbr.select.prepare", err, kvs{
+				"sql": query,
+			})
+		}
+		rows, err = stmt.Query(i.BindValues...)
+		if err != nil {
+			return 0, log.EventErrKv("dbr.select.load.query", err, kvs{
+				"sql":  query,
+				"args": fmt.Sprint(i.BindValues),
+			})
+		}
+	} else {
+		rows, err = runner.Query(query, value...)
+		if err != nil {
+			return 0, log.EventErrKv("dbr.select.load.query", err, kvs{
+				"sql": query,
+			})
+		}
 	}
+
 	count, err := Load(rows, dest)
 	if err != nil {
 		return 0, log.EventErrKv("dbr.select.load.scan", err, kvs{

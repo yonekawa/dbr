@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-type sqlite3 struct{}
+type sqlite3 struct {
+	preparedStatement bool
+}
 
 func (d sqlite3) QuoteIdent(s string) string {
 	return quoteIdent(s, `"`)
@@ -37,4 +39,12 @@ func (d sqlite3) EncodeBytes(b []byte) string {
 
 func (d sqlite3) Placeholder(_ int) string {
 	return "?"
+}
+
+func (d sqlite3) PreparedStatement() bool {
+	return SQLite3.preparedStatement
+}
+
+func (d sqlite3) SetPreparedStatement(use bool) {
+	SQLite3.preparedStatement = use
 }

@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-type mysql struct{}
+type mysql struct {
+	preparedStatement bool
+}
 
 func (d mysql) QuoteIdent(s string) string {
 	return quoteIdent(s, "`")
@@ -63,4 +65,12 @@ func (d mysql) EncodeBytes(b []byte) string {
 
 func (d mysql) Placeholder(_ int) string {
 	return "?"
+}
+
+func (d mysql) PreparedStatement() bool {
+	return MySQL.preparedStatement
+}
+
+func (d mysql) SetPreparedStatement(use bool) {
+	MySQL.preparedStatement = use
 }

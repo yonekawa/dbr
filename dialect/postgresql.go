@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-type postgreSQL struct{}
+type postgreSQL struct {
+	preparedStatement bool
+}
 
 func (d postgreSQL) QuoteIdent(s string) string {
 	return quoteIdent(s, `"`)
@@ -34,4 +36,12 @@ func (d postgreSQL) EncodeBytes(b []byte) string {
 
 func (d postgreSQL) Placeholder(n int) string {
 	return fmt.Sprintf("$%d", n+1)
+}
+
+func (d postgreSQL) PreparedStatement() bool {
+	return PostgreSQL.preparedStatement
+}
+
+func (d postgreSQL) SetPreparedStatement(use bool) {
+	PostgreSQL.preparedStatement = use
 }
